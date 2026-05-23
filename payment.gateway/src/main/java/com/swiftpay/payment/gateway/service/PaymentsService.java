@@ -2,6 +2,7 @@ package com.swiftpay.payment.gateway.service;
 
 import java.math.BigDecimal;
 import java.time.Duration;
+import java.util.UUID;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,9 @@ import com.swiftpay.payment.gateway.repository.PaymentsRepository;
 import org.springframework.data.redis.core.StringRedisTemplate;
 import com.swiftpay.payment.gateway.exception.InsufficientBalanceException;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class PaymentsService {
 
@@ -46,13 +50,17 @@ public class PaymentsService {
 
     @Transactional
     public PaymentResponse createPayment(PaymentRequest paymentRequest, String idempotencyKey) {
+        log.info("Received request to create payment. senderId: {}, receiverId: {}, amount: {}, currency: {}, idempotencyKey: {}", 
+                 paymentRequest.getSenderId(), paymentRequest.getReceiverId(), paymentRequest.getAmount(), paymentRequest.getCurrency(), idempotencyKey);
         // if (idempotencyKey == null || idempotencyKey.isBlank()) {
+        //     log.warn("Missing idempotency key for payment request from senderId: {}", paymentRequest.getSenderId());
         //     throw new MissingIdempotencyKeyException("Idempotency-Key header is required");
         // }
 
         // String redisKey = idempotencyPrefix + idempotencyKey;
         // Boolean accepted = stringRedisTemplate.opsForValue().setIfAbsent(redisKey, "IN_PROGRESS", IDEMPOTENCY_TTL);
         // if (!Boolean.TRUE.equals(accepted)) {
+        //     log.warn("Duplicate transaction detected for idempotency key: {}", idempotencyKey);
         //     throw new DuplicateTransactionException("Duplicate transaction detected. Try again after 24 hours");
         // }
 
@@ -61,6 +69,7 @@ public class PaymentsService {
         // BigDecimal amount = paymentRequest.getAmount();
 
         // if (senderBalance.compareTo(amount) < 0) {
+        //     log.error("Insufficient balance for senderId: {}. Available: {}, Required: {}", paymentRequest.getSenderId(), senderBalance, amount);
         //     throw new InsufficientBalanceException("Insufficient sender balance");
         // }
 
@@ -72,6 +81,7 @@ public class PaymentsService {
         payment.setStatus(Status.PENDING);
 
         Payments savedPayment = paymentsRepository.save(payment);
+        log.info("Payment saved with PENDING status. paymentId: {}", savedPayment.getPaymentId());
 
         paymentEventPublisher.publishPaymentInitiated(new PaymentInitiatedEvent(
                 savedPayment.getPaymentId(),
@@ -81,6 +91,7 @@ public class PaymentsService {
                 savedPayment.getCurrency(),
                 savedPayment.getStatus().name(),
                 idempotencyKey));
+        log.info("PaymentInitiatedEvent published for paymentId: {}", savedPayment.getPaymentId());
 
         // stringRedisTemplate.opsForValue().set(redisKey, "PROCESSED", IDEMPOTENCY_TTL);
 
@@ -92,5 +103,17 @@ public class PaymentsService {
         response.setPaymentId(payment.getPaymentId());
         response.setStatus(payment.getStatus().name());
         return response;
+    }
+
+    public void updatePaymentStatus(UUID paymentId, Status newStatus) {
+        log.info("Updating payment status for paymentId: {} to {}", paymentId, newStatus);
+        Payments payment = paymentsRepository.findById(paymentId)
+                .orElseThrow(() -> {
+                    log.error("Payment not found for update. paymentId: {}", paymentId);
+                    return new RuntimeException("Payment not found: " + paymentId);
+                });
+        payment.setStatus(newStatus);
+        paymentsRepository.save(payment);
+        log.info("Successfully updated payment status for paymentId: {}", paymentId);
     }
 }
