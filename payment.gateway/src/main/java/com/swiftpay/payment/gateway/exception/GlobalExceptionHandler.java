@@ -25,6 +25,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(MissingIdempotencyKeyException.class)
     public ResponseEntity<Map<String, Object>> handleMissingIdempotencyKey(MissingIdempotencyKeyException ex,
             HttpServletRequest request) {
+        logger.warn("MissingIdempotencyKeyException at {}: {}", request.getRequestURI(), ex.getMessage());
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("timestamp", Instant.now().toString());
         body.put("status", HttpStatus.BAD_REQUEST.value());
@@ -37,6 +38,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(InsufficientBalanceException.class)
     public ResponseEntity<Map<String, Object>> handleInsufficientBalance(InsufficientBalanceException ex,
             HttpServletRequest request) {
+        logger.warn("InsufficientBalanceException at {}: {}", request.getRequestURI(), ex.getMessage());
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("timestamp", Instant.now().toString());
         body.put("status", HttpStatus.UNPROCESSABLE_ENTITY.value());
@@ -49,6 +51,7 @@ public class GlobalExceptionHandler {
     @ExceptionHandler(DuplicateTransactionException.class)
     public ResponseEntity<Map<String, Object>> handleDuplicateTransaction(DuplicateTransactionException ex,
             HttpServletRequest request) {
+        logger.warn("DuplicateTransactionException at {}: {}", request.getRequestURI(), ex.getMessage());
         Map<String, Object> body = new LinkedHashMap<>();
         body.put("timestamp", Instant.now().toString());
         body.put("status", HttpStatus.CONFLICT.value());

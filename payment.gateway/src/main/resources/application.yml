@@ -25,6 +25,16 @@ spring:
       key-serializer: org.apache.kafka.common.serialization.StringSerializer
       value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
 
+    consumer:
+      group-id: payment-group
+      key-deserializer: org.apache.kafka.common.serialization.StringDeserializer
+      value-deserializer: org.springframework.kafka.support.serializer.JsonDeserializer
+      properties:
+        spring:
+          json:
+            trusted:
+              packages: "*"
+
   cloud:
     openfeign:
       circuitbreaker:
@@ -35,4 +45,6 @@ swiftpay:
     base-url: ${LEDGER_BASE_URL:http://ledger:8080}
   kafka:
     topics:
-      payment-initiated: ${PAYMENT_INITIATED_TOPIC:payment.initiated}
+      payment-initiated: ${PAYMENT_INITIATED_TOPIC:payment-initiated}
+      payment-completed: ${PAYMENT_COMPLETED_TOPIC:payment-completed}
+      payment-failed: ${PAYMENT_FAILED_TOPIC:payment-failed}

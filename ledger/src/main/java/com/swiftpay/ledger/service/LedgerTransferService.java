@@ -17,6 +17,9 @@ import com.swiftpay.ledger.exception.ResourceNotFoundException;
 import com.swiftpay.ledger.repository.AccountsRepository;
 import com.swiftpay.ledger.repository.LedgerEntriesRepository;
 
+import lombok.extern.slf4j.Slf4j;
+
+@Slf4j
 @Service
 public class LedgerTransferService {
 
@@ -30,15 +33,26 @@ public class LedgerTransferService {
 
     @Transactional
     public PaymentCompletedEvent processPayment(PaymentInitiatedEvent event) {
+        log.info("Processing payment for paymentId: {}, amount: {}, from sender: {} to receiver: {}", 
+                 event.paymentId(), event.amount(), event.senderId(), event.receiverId());
+
         validateAmount(event.amount());
 
         Accounts sender = accountsRepository.findByAccountIdForUpdate(event.senderId())
-                .orElseThrow(() -> new ResourceNotFoundException("Sender account not found: " + event.senderId()));
+                .orElseThrow(() -> {
+                    log.error("Sender account not found: {}", event.senderId());
+                    return new ResourceNotFoundException("Sender account not found: " + event.senderId());
+                });
 
         Accounts receiver = accountsRepository.findByAccountIdForUpdate(event.receiverId())
-                .orElseThrow(() -> new ResourceNotFoundException("Receiver account not found: " + event.receiverId()));
+                .orElseThrow(() -> {
+                    log.error("Receiver account not found: {}", event.receiverId());
+                    return new ResourceNotFoundException("Receiver account not found: " + event.receiverId());
+                });
 
         if (sender.getBalance().compareTo(event.amount()) < 0 || sender.getBalance().subtract(event.amount()).compareTo(BigDecimal.ZERO) < 0) {
+            log.warn("Insufficient funds for sender {}. Current balance: {}, Required: {}", 
+                     sender.getAccountId(), sender.getBalance(), event.amount());
             throw new InsufficientFundsException("Insufficient funds for account: " + sender.getAccountId());
         }
 
@@ -53,6 +67,9 @@ public class LedgerTransferService {
         ledgerEntriesRepository.save(createEntry(event, receiver.getAccountId(), sender.getAccountId(), Type.CREDIT,
                 event.amount(), receiver.getBalance()));
 
+        log.info("Payment completed successfully for paymentId: {}. Sender new balance: {}, Receiver new balance: {}", 
+                 event.paymentId(), sender.getBalance(), receiver.getBalance());
+
         return new PaymentCompletedEvent(
                 event.paymentId(),
                 event.senderId(),
@@ -66,6 +83,7 @@ public class LedgerTransferService {
 
     private void validateAmount(BigDecimal amount) {
         if (amount == null || amount.compareTo(BigDecimal.ZERO) <= 0) {
+            log.warn("Invalid transfer amount: {}", amount);
             throw new IllegalArgumentException("Transfer amount must be greater than zero");
         }
     }

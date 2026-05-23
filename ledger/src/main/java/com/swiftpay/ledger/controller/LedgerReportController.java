@@ -1,5 +1,6 @@
 package com.swiftpay.ledger.controller;
 
+import lombok.extern.slf4j.Slf4j;
 import java.util.List;
 import java.util.UUID;
 
@@ -12,6 +13,7 @@ import com.swiftpay.ledger.dto.TransactionHistoryResponse;
 import com.swiftpay.ledger.entity.LedgerEntries;
 import com.swiftpay.ledger.repository.LedgerEntriesRepository;
 
+@Slf4j
 @RestController
 @RequestMapping("/api/ledger")
 public class LedgerReportController {
@@ -24,7 +26,10 @@ public class LedgerReportController {
 
     @GetMapping("/transactions/{userId}")
     public List<TransactionHistoryResponse> getTransactionsByUser(@PathVariable UUID userId) {
-        return ledgerEntriesRepository.findByAccountIdOrderByCreatedAtDesc(userId)
+        log.info("Fetching transaction history for userId: {}", userId);
+        List<LedgerEntries> entries = ledgerEntriesRepository.findByAccountIdOrderByCreatedAtDesc(userId);
+        log.info("Successfully fetched {} transaction(s) for userId: {}", entries.size(), userId);
+        return entries
                 .stream()
                 .map(this::toResponse)
                 .toList();
