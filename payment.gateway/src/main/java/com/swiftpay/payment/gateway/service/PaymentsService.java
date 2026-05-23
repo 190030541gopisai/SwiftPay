@@ -13,7 +13,7 @@ import com.swiftpay.payment.gateway.dto.response.BalanceResponse;
 import com.swiftpay.payment.gateway.dto.response.PaymentResponse;
 import com.swiftpay.payment.gateway.entity.Payments;
 import com.swiftpay.payment.gateway.entity.Status;
-import com.swiftpay.payment.gateway.event.PaymentInitiatedEvent;
+import com.swiftpay.common.event.PaymentInitiatedEvent;
 import com.swiftpay.payment.gateway.exception.DuplicateTransactionException;
 import com.swiftpay.payment.gateway.publisher.PaymentEventPublisher;
 import com.swiftpay.payment.gateway.repository.PaymentsRepository;
@@ -46,23 +46,23 @@ public class PaymentsService {
 
     @Transactional
     public PaymentResponse createPayment(PaymentRequest paymentRequest, String idempotencyKey) {
-        if (idempotencyKey == null || idempotencyKey.isBlank()) {
-            throw new MissingIdempotencyKeyException("Idempotency-Key header is required");
-        }
+        // if (idempotencyKey == null || idempotencyKey.isBlank()) {
+        //     throw new MissingIdempotencyKeyException("Idempotency-Key header is required");
+        // }
 
-        String redisKey = idempotencyPrefix + idempotencyKey;
-        Boolean accepted = stringRedisTemplate.opsForValue().setIfAbsent(redisKey, "IN_PROGRESS", IDEMPOTENCY_TTL);
-        if (!Boolean.TRUE.equals(accepted)) {
-            throw new DuplicateTransactionException("Duplicate transaction detected. Try again after 24 hours");
-        }
+        // String redisKey = idempotencyPrefix + idempotencyKey;
+        // Boolean accepted = stringRedisTemplate.opsForValue().setIfAbsent(redisKey, "IN_PROGRESS", IDEMPOTENCY_TTL);
+        // if (!Boolean.TRUE.equals(accepted)) {
+        //     throw new DuplicateTransactionException("Duplicate transaction detected. Try again after 24 hours");
+        // }
 
-        BalanceResponse senderBalanceResponse = ledgerClient.getBalance(paymentRequest.getSenderId());
-        BigDecimal senderBalance = senderBalanceResponse.getBalance();
-        BigDecimal amount = paymentRequest.getAmount();
+        // BalanceResponse senderBalanceResponse = ledgerClient.getBalance(paymentRequest.getSenderId());
+        // BigDecimal senderBalance = senderBalanceResponse.getBalance();
+        // BigDecimal amount = paymentRequest.getAmount();
 
-        if (senderBalance.compareTo(amount) < 0) {
-            throw new InsufficientBalanceException("Insufficient sender balance");
-        }
+        // if (senderBalance.compareTo(amount) < 0) {
+        //     throw new InsufficientBalanceException("Insufficient sender balance");
+        // }
 
         Payments payment = new Payments();
         payment.setSenderId(paymentRequest.getSenderId());
