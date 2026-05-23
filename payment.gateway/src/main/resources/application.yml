@@ -1,0 +1,38 @@
+spring:
+  application:
+    name: nonmus
+  datasource:
+    url: jdbc:postgresql://localhost:5400/payment_gateway
+    username: user
+    password: ${DB_PASSWORD:root}
+    driver-class-name: org.postgresql.Driver
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+    show-sql: true
+
+  redis:
+    host: localhost
+    port: 6379
+    password: "root"
+
+  kafka:
+    bootstrap-servers: localhost:9092
+    producer:
+      key-serializer: org.apache.kafka.common.serialization.StringSerializer
+      value-serializer: org.springframework.kafka.support.serializer.JsonSerializer
+
+  cloud:
+    openfeign:
+      circuitbreaker:
+        enabled: true
+
+swiftpay:
+  ledger:
+    base-url: ${LEDGER_BASE_URL:http://ledger:8080}
+  kafka:
+    topics:
+      payment-initiated: ${PAYMENT_INITIATED_TOPIC:payment.initiated}
