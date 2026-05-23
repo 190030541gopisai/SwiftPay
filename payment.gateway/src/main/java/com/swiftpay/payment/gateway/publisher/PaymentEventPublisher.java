@@ -4,7 +4,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.kafka.core.KafkaTemplate;
 import org.springframework.stereotype.Component;
 
-import com.swiftpay.payment.gateway.event.PaymentInitiatedEvent;
+import com.swiftpay.common.event.PaymentInitiatedEvent;
 
 @Component
 public class PaymentEventPublisher {
@@ -13,7 +13,7 @@ public class PaymentEventPublisher {
     private final String paymentInitiatedTopic;
 
     public PaymentEventPublisher(KafkaTemplate<String, PaymentInitiatedEvent> kafkaTemplate,
-            @Value("${swiftpay.kafka.topics.payment-initiated:payment.initiated}") String paymentInitiatedTopic) {
+            @Value("payment-initiated") String paymentInitiatedTopic) {
         this.kafkaTemplate = kafkaTemplate;
         this.paymentInitiatedTopic = paymentInitiatedTopic;
     }
