@@ -2,11 +2,27 @@
   "configurations": [
     {
       "type": "java",
+      "name": "LedgerApplication",
+      "request": "launch",
+      "mainClass": "com.swiftpay.ledger.LedgerApplication"
+    },
+    {
+      "type": "java",
       "name": "Spring Boot-Application<payment.gateway>",
       "request": "launch",
       "cwd": "${workspaceFolder}",
       "mainClass": "com.swiftpay.payment.gateway.Application",
       "projectName": "payment.gateway",
+      "args": "",
+      "envFile": "${workspaceFolder}/.env"
+    },
+    {
+      "type": "java",
+      "name": "Spring Boot-LedgerApplication<ledger>",
+      "request": "launch",
+      "cwd": "${workspaceFolder}",
+      "mainClass": "com.swiftpay.ledger.LedgerApplication",
+      "projectName": "ledger",
       "args": "",
       "envFile": "${workspaceFolder}/.env"
     }
