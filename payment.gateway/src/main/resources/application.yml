@@ -47,6 +47,12 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health
+
 swiftpay:
   ledger:
     base-url: ${LEDGER_BASE_URL:http://ledger:8080}
