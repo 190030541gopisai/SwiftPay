@@ -2,8 +2,8 @@ package com.swiftpay.payment.gateway.exception;
 
 import java.time.Instant;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
-import org.apache.kafka.shaded.com.google.protobuf.Internal;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -12,6 +12,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MethodArgumentNotValidException;
 
 import com.swiftpay.payment.gateway.dto.response.ErrorResponse;
 import com.swiftpay.payment.gateway.dto.response.InternalServerErrorResponse;
@@ -24,7 +25,7 @@ public class GlobalExceptionHandler {
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     @ExceptionHandler(LedgerUnavailableException.class)
-    public ResponseEntity<ErrorResponse> handleLedgerUnavailable(LedgerUnavailableException ex,
+    public ResponseEntity<InternalServerErrorResponse> handleLedgerUnavailable(LedgerUnavailableException ex,
             HttpServletRequest request) {
         logger.warn("LedgerUnavailableException at {}: {}", request.getRequestURI(), ex.getMessage());
         ErrorResponse errorResponse = new ErrorResponse();
@@ -33,7 +34,12 @@ public class GlobalExceptionHandler {
         errorResponse.setError(HttpStatus.SERVICE_UNAVAILABLE.getReasonPhrase());
         errorResponse.setMessage(ex.getMessage());
         errorResponse.setPath(request.getRequestURI());
-        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(errorResponse);
+
+        InternalServerErrorResponse internalError = new InternalServerErrorResponse();
+        internalError.setError(errorResponse);
+        internalError.setErrorId(UUID.randomUUID().toString());
+
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(internalError);
     }
 
     @ExceptionHandler(com.swiftpay.payment.gateway.exception.PaymentNotFoundException.class)
@@ -79,13 +85,14 @@ public class GlobalExceptionHandler {
     public ResponseEntity<ErrorResponse> handleInsufficientBalance(InsufficientBalanceException ex,
             HttpServletRequest request) {
         logger.warn("InsufficientBalanceException at {}: {}", request.getRequestURI(), ex.getMessage());
+        int statusCode = 422;
         ErrorResponse errorResponse = new ErrorResponse();
         errorResponse.setTimestamp(Instant.now().toString());
-        errorResponse.setStatus(HttpStatus.UNPROCESSABLE_ENTITY.value());
-        errorResponse.setError(HttpStatus.UNPROCESSABLE_ENTITY.getReasonPhrase());
+        errorResponse.setStatus(statusCode);
+        errorResponse.setError("Unprocessable Entity");
         errorResponse.setMessage(ex.getMessage());
         errorResponse.setPath(request.getRequestURI());
-        return ResponseEntity.status(HttpStatus.UNPROCESSABLE_ENTITY).body(errorResponse);
+        return ResponseEntity.status(statusCode).body(errorResponse);
     }
 
     @ExceptionHandler(DuplicateTransactionException.class)
@@ -114,12 +121,29 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
     }
 
+    @ExceptionHandler(MethodArgumentNotValidException.class)
+    public ResponseEntity<ErrorResponse> handleMethodArgumentNotValid(MethodArgumentNotValidException ex,
+            HttpServletRequest request) {
+        String message = ex.getBindingResult().getFieldErrors().stream()
+                .map(fieldError -> String.format("%s: %s", fieldError.getField(), fieldError.getDefaultMessage()))
+                .collect(Collectors.joining("; "));
+
+        logger.warn("Validation failed at {}: {}", request.getRequestURI(), message);
+        ErrorResponse errorResponse = new ErrorResponse();
+        errorResponse.setTimestamp(Instant.now().toString());
+        errorResponse.setStatus(HttpStatus.BAD_REQUEST.value());
+        errorResponse.setError(HttpStatus.BAD_REQUEST.getReasonPhrase());
+        errorResponse.setMessage(message);
+        errorResponse.setPath(request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(errorResponse);
+    }
+
     @ExceptionHandler(Exception.class)
     public ResponseEntity<InternalServerErrorResponse> handleException(Exception ex, HttpServletRequest request) {
         String errorId = UUID.randomUUID().toString();
         logger.error("Unhandled exception (errorId={})", errorId, ex);
 
-        HttpStatus status = HttpStatus.SERVICE_UNAVAILABLE;
+        HttpStatus status = HttpStatus.INTERNAL_SERVER_ERROR;
         ErrorResponse errorResponse = new ErrorResponse();
         errorResponse.setTimestamp(Instant.now().toString());
         errorResponse.setStatus(status.value());
