@@ -15,6 +15,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import jakarta.validation.Valid;
 
 import com.swiftpay.payment.gateway.dto.request.PaymentRequest;
 import com.swiftpay.payment.gateway.dto.response.ErrorResponse;
@@ -91,11 +92,20 @@ public class PaymentsController {
                     mediaType = "application/json",
                     schema = @Schema(implementation = InternalServerErrorResponse.class)                
                 )
+            ),
+
+            @ApiResponse(
+                responseCode = "500",
+                description = "Unexpected internal server error",
+                content = @Content(
+                    mediaType = "application/json",
+                    schema = @Schema(implementation = InternalServerErrorResponse.class)
+                )
             )
     })
     @PostMapping
     public ResponseEntity<PaymentResponse> createPayment(
-        @RequestBody PaymentRequest paymentRequest, 
+        @Valid @RequestBody PaymentRequest paymentRequest, 
         @Parameter(
             description = "Unique idempotency key",
             required = true,
