@@ -14,6 +14,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.ControllerAdvice;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
+import org.springframework.web.bind.MissingRequestHeaderException;
 
 import feign.RetryableException;
 
@@ -21,6 +22,45 @@ import feign.RetryableException;
 public class GlobalExceptionHandler {
 
     private static final Logger logger = LoggerFactory.getLogger(GlobalExceptionHandler.class);
+
+    @ExceptionHandler(LedgerUnavailableException.class)
+    public ResponseEntity<Map<String, Object>> handleLedgerUnavailable(LedgerUnavailableException ex,
+            HttpServletRequest request) {
+        logger.warn("LedgerUnavailableException at {}: {}", request.getRequestURI(), ex.getMessage());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", Instant.now().toString());
+        body.put("status", HttpStatus.SERVICE_UNAVAILABLE.value());
+        body.put("error", HttpStatus.SERVICE_UNAVAILABLE.getReasonPhrase());
+        body.put("message", ex.getMessage());
+        body.put("path", request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.SERVICE_UNAVAILABLE).body(body);
+    }
+
+    @ExceptionHandler(com.swiftpay.payment.gateway.exception.PaymentNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handlePaymentNotFound(com.swiftpay.payment.gateway.exception.PaymentNotFoundException ex,
+            HttpServletRequest request) {
+        logger.warn("PaymentNotFoundException at {}: {}", request.getRequestURI(), ex.getMessage());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", Instant.now().toString());
+        body.put("status", HttpStatus.NOT_FOUND.value());
+        body.put("error", HttpStatus.NOT_FOUND.getReasonPhrase());
+        body.put("message", ex.getMessage());
+        body.put("path", request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
+
+    @ExceptionHandler(AccountNotFoundException.class)
+    public ResponseEntity<Map<String, Object>> handleAccountNotFound(AccountNotFoundException ex,
+            HttpServletRequest request) {
+        logger.warn("AccountNotFoundException at {}: {}", request.getRequestURI(), ex.getMessage());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", Instant.now().toString());
+        body.put("status", HttpStatus.NOT_FOUND.value());
+        body.put("error", HttpStatus.NOT_FOUND.getReasonPhrase());
+        body.put("message", ex.getMessage());
+        body.put("path", request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.NOT_FOUND).body(body);
+    }
 
     @ExceptionHandler(MissingIdempotencyKeyException.class)
     public ResponseEntity<Map<String, Object>> handleMissingIdempotencyKey(MissingIdempotencyKeyException ex,
@@ -59,6 +99,19 @@ public class GlobalExceptionHandler {
         body.put("message", ex.getMessage());
         body.put("path", request.getRequestURI());
         return ResponseEntity.status(HttpStatus.CONFLICT).body(body);
+    }
+
+    @ExceptionHandler(MissingRequestHeaderException.class)
+    public ResponseEntity<Map<String, Object>> handleMissingRequestHeader(MissingRequestHeaderException ex,
+            HttpServletRequest request) {
+        logger.warn("MissingRequestHeader: {} at {}", ex.getHeaderName(), request.getRequestURI());
+        Map<String, Object> body = new LinkedHashMap<>();
+        body.put("timestamp", Instant.now().toString());
+        body.put("status", HttpStatus.BAD_REQUEST.value());
+        body.put("error", HttpStatus.BAD_REQUEST.getReasonPhrase());
+        body.put("message", String.format("Required request header '%s' is missing", ex.getHeaderName()));
+        body.put("path", request.getRequestURI());
+        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(body);
     }
 
     @ExceptionHandler(Exception.class)
