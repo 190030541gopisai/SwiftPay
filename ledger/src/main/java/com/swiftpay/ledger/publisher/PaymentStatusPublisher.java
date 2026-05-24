@@ -18,8 +18,8 @@ public class PaymentStatusPublisher {
 
     public PaymentStatusPublisher(
             KafkaTemplate<String, Object> kafkaTemplate,
-            @Value("${kafka.topics.payment-completed:payment-completed}") String paymentCompletedTopic,
-            @Value("${kafka.topics.payment-failed:payment-failed}") String paymentFailedTopic) {
+            @Value("${swiftpay.kafka.topics.payment-completed:payment-completed}") String paymentCompletedTopic,
+            @Value("${swiftpay.kafka.topics.payment-failed:payment-failed}") String paymentFailedTopic) {
         this.kafkaTemplate = kafkaTemplate;
         this.paymentCompletedTopic = paymentCompletedTopic;
         this.paymentFailedTopic = paymentFailedTopic;
