@@ -3,6 +3,7 @@ package com.swiftpay.payment.gateway.service;
 import java.math.BigDecimal;
 import java.time.Duration;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -21,6 +22,9 @@ import com.swiftpay.payment.gateway.repository.PaymentsRepository;
 
 import org.springframework.data.redis.core.StringRedisTemplate;
 import com.swiftpay.payment.gateway.exception.InsufficientBalanceException;
+import com.swiftpay.payment.gateway.exception.AccountNotFoundException;
+import com.swiftpay.payment.gateway.exception.PaymentNotFoundException;
+import feign.FeignException;
 
 import lombok.extern.slf4j.Slf4j;
 
@@ -52,26 +56,41 @@ public class PaymentsService {
     public PaymentResponse createPayment(PaymentRequest paymentRequest, String idempotencyKey) {
         log.info("Received request to create payment. senderId: {}, receiverId: {}, amount: {}, currency: {}, idempotencyKey: {}", 
                  paymentRequest.getSenderId(), paymentRequest.getReceiverId(), paymentRequest.getAmount(), paymentRequest.getCurrency(), idempotencyKey);
-        // if (idempotencyKey == null || idempotencyKey.isBlank()) {
-        //     log.warn("Missing idempotency key for payment request from senderId: {}", paymentRequest.getSenderId());
-        //     throw new MissingIdempotencyKeyException("Idempotency-Key header is required");
-        // }
+        if (idempotencyKey == null || idempotencyKey.isBlank()) {
+            log.warn("Missing idempotency key for payment request from senderId: {}", paymentRequest.getSenderId());
+            throw new MissingIdempotencyKeyException("Idempotency-Key header is required");
+        }
 
-        // String redisKey = idempotencyPrefix + idempotencyKey;
-        // Boolean accepted = stringRedisTemplate.opsForValue().setIfAbsent(redisKey, "IN_PROGRESS", IDEMPOTENCY_TTL);
-        // if (!Boolean.TRUE.equals(accepted)) {
-        //     log.warn("Duplicate transaction detected for idempotency key: {}", idempotencyKey);
-        //     throw new DuplicateTransactionException("Duplicate transaction detected. Try again after 24 hours");
-        // }
+        String redisKey = idempotencyPrefix + idempotencyKey;
+        Boolean accepted = stringRedisTemplate.opsForValue().setIfAbsent(redisKey, "IN_PROGRESS", IDEMPOTENCY_TTL);
+        if (!Boolean.TRUE.equals(accepted)) {
+            log.warn("Duplicate transaction detected for idempotency key: {}", idempotencyKey);
+            Long expireHours = stringRedisTemplate.getExpire(redisKey, TimeUnit.HOURS);
+            long hoursLeft = (expireHours != null && expireHours > 0) ? expireHours : 1;
+            throw new DuplicateTransactionException(String.format("Duplicate transaction detected. Try again after %d hours", hoursLeft));
+        }
 
-        // BalanceResponse senderBalanceResponse = ledgerClient.getBalance(paymentRequest.getSenderId());
-        // BigDecimal senderBalance = senderBalanceResponse.getBalance();
-        // BigDecimal amount = paymentRequest.getAmount();
+        BalanceResponse senderBalanceResponse;
+        try {
+            senderBalanceResponse = ledgerClient.getBalance(paymentRequest.getSenderId());
+        } catch (FeignException.NotFound e) {
+            log.warn("Sender account not found in ledger: {}", paymentRequest.getSenderId());
+            throw new AccountNotFoundException("Sender account not found: " + paymentRequest.getSenderId());
+        }
 
-        // if (senderBalance.compareTo(amount) < 0) {
-        //     log.error("Insufficient balance for senderId: {}. Available: {}, Required: {}", paymentRequest.getSenderId(), senderBalance, amount);
-        //     throw new InsufficientBalanceException("Insufficient sender balance");
-        // }
+        boolean receiverExists = ledgerClient.checkAccountExists(paymentRequest.getReceiverId());
+        if (!receiverExists) {
+            log.warn("Receiver account not found in ledger: {}", paymentRequest.getReceiverId());
+            throw new AccountNotFoundException("Receiver account not found: " + paymentRequest.getReceiverId());
+        }
+
+        BigDecimal senderBalance = senderBalanceResponse.getBalance();
+        BigDecimal amount = paymentRequest.getAmount();
+
+        if (senderBalance.compareTo(amount) < 0) {
+            log.error("Insufficient balance for senderId: {}. Available: {}, Required: {}", paymentRequest.getSenderId(), senderBalance, amount);
+            throw new InsufficientBalanceException("Insufficient sender balance");
+        }
 
         Payments payment = new Payments();
         payment.setSenderId(paymentRequest.getSenderId());
@@ -93,7 +112,7 @@ public class PaymentsService {
                 idempotencyKey));
         log.info("PaymentInitiatedEvent published for paymentId: {}", savedPayment.getPaymentId());
 
-        // stringRedisTemplate.opsForValue().set(redisKey, "PROCESSED", IDEMPOTENCY_TTL);
+        stringRedisTemplate.opsForValue().set(redisKey, "PROCESSED", IDEMPOTENCY_TTL);
 
         return mapToResponse(savedPayment);
     }
@@ -110,7 +129,7 @@ public class PaymentsService {
         Payments payment = paymentsRepository.findById(paymentId)
                 .orElseThrow(() -> {
                     log.error("Payment not found for update. paymentId: {}", paymentId);
-                    return new RuntimeException("Payment not found: " + paymentId);
+                    return new PaymentNotFoundException("Payment not found: " + paymentId);
                 });
         payment.setStatus(newStatus);
         paymentsRepository.save(payment);
