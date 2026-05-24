@@ -72,6 +72,32 @@
       "response": []
     },
     {
+      "name": "Payment Gateway - Create Payment (validation error)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey5}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"senderId\": \"{{senderId}}\",\n  \"receiverId\": \"{{receiverId}}\",\n  \"amount\": 10.50\n}"
+        },
+        "url": {
+          "raw": "{{payment_base_url}}/v1/payments",
+          "host": ["{{payment_base_url}}"],
+          "path": ["v1", "payments"]
+        }
+      },
+      "response": []
+    },
+    {
       "name": "Payment Gateway - Create Payment (missing idempotency key)",
       "request": {
         "method": "POST",
@@ -246,6 +272,10 @@
     {
       "key": "idempotencyKey4",
       "value": "idem-00004"
+    },
+    {
+      "key": "idempotencyKey5",
+      "value": "idem-00005"
     }
   ]
 }
