@@ -199,7 +199,57 @@ The hackathon brief asks for a 250 TPS load test with a PCAP trace. This repo in
 - `result.jtl` - JMeter results output
 - `internal.pcap` - captured traffic trace
 
-To rerun the capture, execute the JMeter plan while capturing traffic with `tcpdump` against the gateway and downstream ports.
+To rerun the capture, there are two practical options.
+
+### Option 1: Capture internal Docker traffic
+
+This is the most complete trace because it records traffic between the gateway, ledger, Redis, Kafka, and PostgreSQL containers.
+
+1. Enter the running container as root:
+
+```bash
+docker exec -u 0 -it payment_gateway sh
+```
+
+1. Install `tcpdump` inside the container.
+
+If the image is Debian or Ubuntu based:
+
+```bash
+apt update && apt install -y tcpdump
+```
+
+If the image is Alpine based:
+
+```bash
+apk add --no-cache tcpdump
+```
+
+1. Start the capture in one line:
+
+```bash
+tcpdump -i any -nn 'port 8081 or port 29092 or port 6379 or port 5432' -w /tmp/internal.pcap
+```
+
+1. Run JMeter at 250 TPS and let the test complete.
+1. Stop `tcpdump` with `CTRL + C`.
+1. Copy the PCAP back to the host:
+
+```bash
+docker cp payment_gateway:/tmp/internal.pcap .
+```
+
+### Option 2: Capture localhost ingress
+
+If you only need proof of live traffic against the API entry point, capturing loopback traffic is often enough for review.
+
+```bash
+sudo tcpdump -i lo port 8080 -w loadtest.pcap
+```
+
+Then run the same JMeter plan at 250 TPS and stop the capture after the test finishes.
+
+This produces a PCAP showing actual network packets, timestamps, TCP flows, and request throughput.
 
 ## Notes
 
