@@ -1,119 +1,208 @@
-# SwiftPay - Real-Time Payment Ledger
+# SwiftPay
 
-**Hackathon Challenge:** A resilient, scalable system that handles peer-to-peer (P2P) money transfers, ensuring data consistency, handling high-volume transactions via caching, and providing real-time audit logs for financial reporting.
+SwiftPay is a real-time payment ledger built for a fintech hackathon scenario. The repo demonstrates a two-service money transfer flow backed by PostgreSQL, Kafka, Redis, Swagger/OpenAPI, Docker Compose, and GitHub Actions.
 
-## 🛠 Technical Stack
+The focus of the implementation is a consistent payment lifecycle:
 
-- **Language:** Java 21 (Spring Boot)
-- **Databases:** PostgreSQL (Separate DBs for Metadata/Transactions and Ledger entries)
-- **Messaging:** Apache Kafka (Event-driven asynchronous updates)
-- **Caching:** Redis (Idempotency and balance caching)
-- **Documentation:** Swagger/OpenAPI
-- **Infrastructure:** Docker & Docker Compose
-- **CI/CD:** GitHub Actions (Compiles code, runs tests, builds Docker images)
-- **Performance Testing:** JMeter & tcpdump (Packet capture)
+1. A client submits a payment to the gateway.
+2. The gateway checks idempotency and balance availability, stores the payment as `PENDING`, and publishes a Kafka event.
+3. The ledger service consumes the event, performs the debit/credit inside a database transaction, records ledger entries, and emits a completion or failure event.
+4. The gateway consumes the status event and updates the payment record.
 
----
+## What is in the repo
 
-## 🏗 System Architecture & functional Flow
+- `payment.gateway/` - REST API for creating payments and tracking final status.
+- `ledger/` - Kafka consumer, balance transfer processor, and reporting API.
+- `common/` - Shared Kafka event records.
+- `load/` - JMeter plan, result output, and a PCAP capture for the load-test submission.
+- `postman/` - Postman collection for manual API testing.
 
-The system is broken down into modular microservices communicating synchronously via HTTP and asynchronously via Kafka.
+## Tech Stack
 
-### 1. Payment Gateway (Service A)
-- **Location:** `payment.gateway/`
-- **Role:** REST API entry point for payment initiation.
-- **Endpoint:** `POST /v1/payments` (Accepts `sender_id`, `receiver_id`, `amount`, `currency`)
-- **Idempotency:** Utilizes **Redis** to ensure the same transaction payload/idempotency key isn't processed twice within a 24-hour window.
-- **Workflow:** Saves initial requests to **PostgreSQL** with a `PENDING` status and emits a `PaymentInitiated` event to **Kafka**.
-- **Port:** `8080`
+- Java 21
+- Spring Boot 4.0.6
+- Spring Cloud 2025.1.1
+- PostgreSQL
+- Apache Kafka
+- Redis
+- Springdoc OpenAPI / Swagger UI
+- Docker Compose
+- GitHub Actions
 
-### 2. Ledger Service (Service B)
-- **Location:** `ledger/`
-- **Role:** Consumer and processor for ledger movements and account balances.
-- **Workflow:** Consumes `PaymentInitiated` events from Kafka. Performs atomic Debit/Credit balance transfers within a strict DB transaction. Emits `PaymentCompleted` or `PaymentFailed` events back to Kafka.
-- **Reporting Endpoint:** Exposes `GET /api/ledger/transactions/{userId}` to fetch the real-time transaction history.
-- **Port:** `8081`
+## Architecture
 
-### 3. Common Library
-- **Location:** `common/`
-- **Role:** Code reuse layer containing shared DTOs, Event Models, and utilities leveraged by both the Gateway and Ledger services.
+### Payment Gateway
 
----
+Location: `payment.gateway/`
 
-## 📋 Non-Functional Implementation
+Responsibilities:
 
-- **API Documentation:** Uses Swagger/OpenAPI for standard documentation.
-- **Resilience:** Kafka consumers implement retry mechanisms to safely delay and retry processing if the database is temporarily down.
-- **Observability:** Health check endpoints (`/health`) are implemented alongside structured application logging.
-- **Error Handling:** Gracefully handles "insufficient funds" logic in the ledger, manages database constraint violations, and guards against Kafka outages.
+- Exposes `POST /v1/payments`.
+- Requires an `Idempotency-Key` header.
+- Uses Redis to reject duplicate requests for 24 hours.
+- Checks the sender balance and receiver existence through the ledger service.
+- Persists the payment as `PENDING` in PostgreSQL.
+- Publishes `PaymentInitiatedEvent` to Kafka.
+- Consumes `PaymentCompletedEvent` and `PaymentFailedEvent` to update the payment status.
 
----
+Runtime port: `8080`
 
-## 🚀 Getting Started
+### Ledger Service
 
-### 1. Build the Applications
+Location: `ledger/`
 
-Since both the Gateway and Ledger services depend on the `common` library, build the applications from the root:
+Responsibilities:
 
-```bash
-# Build the common library
-cd common && ./mvnw clean install
+- Consumes `PaymentInitiatedEvent` from Kafka.
+- Locks the sender and receiver rows and performs the transfer in a single database transaction.
+- Writes debit and credit ledger entries.
+- Publishes `PaymentCompletedEvent` or `PaymentFailedEvent` back to Kafka.
+- Exposes reporting endpoints for balances, account existence, and transaction history.
 
-# Build Ledger
-cd ../ledger && ./mvnw clean package -DskipTests
+Runtime port: `8081`
 
-# Build Payment Gateway
-cd ../payment.gateway && ./mvnw clean package -DskipTests
-```
+### Shared Events
 
-### 2. Spin up the Ecosystem
+The `common/` module contains the Kafka payloads used by both services:
 
-The `docker-compose.yml` provides the entire containerized ecosystem (Spring Boot Apps + Postgres + Kafka + Redis).
+- `PaymentInitiatedEvent`
+- `PaymentCompletedEvent`
+- `PaymentFailedEvent`
 
-```bash
-cd ..
-docker compose up -d
-```
+## Kafka Topics
 
-Verify everything is running successfully (`docker ps`). Both Postgres DBs, Redis, Kafka, the Ledger App, and the Payment Gateway App should be `Up`.
+- `payment-initiated`
+- `payment-completed`
+- `payment-failed`
 
----
+## API Endpoints
 
-## 🧪 Testing the APIs
+### Payment Gateway
 
-A Postman collection is included in the project under the `postman/` directory:
-* **File:** `postman/SwiftPay.postman_collection.json`
-* Import this file into Postman to issue pre-configured `POST /v1/payments` requests and test the Ledger GET requests. 
+- `POST /v1/payments`
+- Swagger UI: `http://localhost:8080/swagger-ui.html`
+- Health: `http://localhost:8080/actuator/health`
 
-**CURL Example (Payment Gateway):**
+Example request:
+
 ```bash
 curl -X POST http://localhost:8080/v1/payments \
   -H "Content-Type: application/json" \
-  -H "Idempotency-Key: $(uuidgen)" \
+  -H "Idempotency-Key: txn-123" \
   -d '{
     "senderId": "11111111-1111-1111-1111-111111111111",
     "receiverId": "22222222-2222-2222-2222-222222222222",
-    "amount": 1,
-    "currency": "INR"
-}'
+    "amount": 10.00,
+    "currency": "USD"
+  }'
 ```
 
----
+### Ledger Service
 
-## ⚡ Load Testing & Capturing PCAP
+- `GET /api/ledger/accounts/{accountId}/exists`
+- `GET /api/ledger/accounts/{accountId}/balance`
+- `GET /api/ledger/transactions/{userId}`
+- Swagger UI: `http://localhost:8081/swagger-ui.html`
+- Health: `http://localhost:8081/actuator/health`
 
-As per the hackathon submission criteria, a load test (250 TPS totaling 1 million transactions) must be executed and evidenced via a PCAP file containing actual network/TCP traffic between the instances.
+### Common Error Cases
 
-### Generating the Evidence
+- `400` - Missing or invalid request data, including a missing idempotency key.
+- `404` - Sender or receiver account not found.
+- `409` - Duplicate transaction detected by Redis idempotency.
+- `422` - Insufficient balance.
+- `503` - Ledger service unavailable.
 
-**Option 1 — Capture Internal Docker Traffic (Recommended/Containerized)**
-1. Enter the gateway container as root: `docker exec -u 0 -it payment_gateway sh`
-2. Install tcpdump: `apt update && apt install -y tcpdump`
-3. Capture traffic: `tcpdump -i any -nn 'port 8081 or port 29092 or port 6379 or port 5432' -w /tmp/internal.pcap`
-4. Run JMeter from host: `jmeter -n -t load/swiftpay.jmx -l load/result.jtl`
-5. Stop dump (`CRTL+C`) and copy to host: `docker cp payment_gateway:/tmp/internal.pcap ./load/internal.pcap`
+## Local Development
 
-**Option 2 — Capture Localhost API Ingress (Alternative)**
-1. Run dump on the host pointing to the entry port: `sudo tcpdump -i lo port 8080 -w load/loadtest.pcap`
-2. Execute JMeter at 250 TPS config: `jmeter -n -t load/swiftpay.jmx -l load/result.jtl`
-3. Hit `CTRL+C` when the test finishes. Push the resulting `.pcap` to GitHub.
+The easiest way to run the full stack locally is Docker Compose.
+
+### Prerequisites
+
+- Java 21
+- Docker and Docker Compose
+- Maven wrapper support is already committed in each module
+
+### Start the stack
+
+```bash
+docker compose up --build
+```
+
+This starts:
+
+- PostgreSQL for the payment gateway on `localhost:5400`
+- PostgreSQL for the ledger service on `localhost:5401`
+- Redis on `localhost:6379`
+- Kafka on `localhost:9092`
+- Payment Gateway on `localhost:8080`
+- Ledger on `localhost:8081`
+
+### Run services without Docker
+
+If you want to run the services from the command line, start the dependencies first and then build the shared module before the services:
+
+```bash
+cd common
+./mvnw -B clean install
+
+cd ../ledger
+./mvnw -B clean package
+
+cd ../payment.gateway
+./mvnw -B clean package
+```
+
+## Seed Data
+
+The ledger service seeds a few local accounts in `ledger/src/main/resources/data.sql` so the flow can be tested immediately.
+
+Useful demo accounts:
+
+- `11111111-1111-1111-1111-111111111111`
+- `22222222-2222-2222-2222-222222222222`
+- `33333333-3333-3333-3333-333333333333`
+- `44444444-4444-4444-4444-444444444444`
+
+## Testing
+
+### Unit and integration tests
+
+Each module has its own test suite.
+
+The payment gateway integration test is disabled by default and must be enabled from the module directory with:
+
+```bash
+cd payment.gateway
+./mvnw -DrunIntegrationTests=true test
+```
+
+The GitHub Actions workflow runs the module builds and tests with integration support enabled.
+
+### GitHub Actions
+
+Workflow: `.github/workflows/ci.yml`
+
+The pipeline:
+
+- waits for PostgreSQL, Redis, and Kafka services
+- installs the shared `common` module
+- builds and tests `ledger`
+- builds and tests `payment.gateway`
+- builds both Docker images
+
+## Load Test and PCAP
+
+The hackathon brief asks for a 250 TPS load test with a PCAP trace. This repo includes the artifacts used for that workflow in `load/`:
+
+- `swiftpay.jmx` - JMeter plan
+- `result.jtl` - JMeter results output
+- `internal.pcap` - captured traffic trace
+
+To rerun the capture, execute the JMeter plan while capturing traffic with `tcpdump` against the gateway and downstream ports.
+
+## Notes
+
+- This repo currently ships with Docker Compose for local orchestration.
+- Kubernetes manifests and the optional analytics worker are not included in the current codebase.
+- The gateway uses OpenFeign plus Resilience4j for downstream communication and retry-friendly behavior.
