@@ -11,7 +11,7 @@ import com.swiftpay.payment.gateway.dto.response.BalanceResponse;
 
 @FeignClient(
     name = "ledger-service", 
-    url = "${swiftpay.ledger.service.url:http://localhost:8081}",
+    url = "${swiftpay.ledger.base-url:http://localhost:8081}",
     fallbackFactory = LedgerClientFallbackFactory.class)
 public interface LedgerClient {
     
