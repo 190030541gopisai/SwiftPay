@@ -14,10 +14,11 @@ spring:
         dialect: org.hibernate.dialect.PostgreSQLDialect
     show-sql: true
 
-  redis:
-    host: localhost
-    port: 6379
-    password: "root"
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      password: "root"
 
   kafka:
     bootstrap-servers: localhost:9092
@@ -55,7 +56,7 @@ management:
 
 swiftpay:
   ledger:
-    base-url: ${LEDGER_BASE_URL:http://ledger:8080}
+    base-url: ${LEDGER_BASE_URL:http://localhost:8081}
   kafka:
     topics:
       payment-initiated: ${PAYMENT_INITIATED_TOPIC:payment-initiated}
