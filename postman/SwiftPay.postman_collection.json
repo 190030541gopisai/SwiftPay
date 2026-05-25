@@ -1,0 +1,281 @@
+{
+  "info": {
+    "name": "SwiftPay API Tests",
+    "_postman_id": "swiftpay-collection-001",
+    "description": "Collection to test Payment Gateway and Ledger scenarios (positive & negative).",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Ledger - Check Account Exists",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{ledger_base_url}}/api/ledger/accounts/{{senderId}}/exists",
+          "host": ["{{ledger_base_url}}"],
+          "path": ["api", "ledger", "accounts", "{{senderId}}", "exists"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Ledger - Get Balance",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{ledger_base_url}}/api/ledger/accounts/{{senderId}}/balance",
+          "host": ["{{ledger_base_url}}"],
+          "path": ["api", "ledger", "accounts", "{{senderId}}", "balance"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Ledger - Transaction History",
+      "request": {
+        "method": "GET",
+        "header": [],
+        "url": {
+          "raw": "{{ledger_base_url}}/api/ledger/transactions/{{userId}}",
+          "host": ["{{ledger_base_url}}"],
+          "path": ["api", "ledger", "transactions", "{{userId}}"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Payment Gateway - Create Payment (happy path)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey1}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"senderId\": \"{{senderId}}\",\n  \"receiverId\": \"{{receiverId}}\",\n  \"amount\": 10.50,\n  \"currency\": \"USD\"\n}"
+        },
+        "url": {
+          "raw": "{{payment_base_url}}/v1/payments",
+          "host": ["{{payment_base_url}}"],
+          "path": ["v1", "payments"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Payment Gateway - Create Payment (validation error)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey5}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"senderId\": \"{{senderId}}\",\n  \"receiverId\": \"{{receiverId}}\",\n  \"amount\": 10.50\n}"
+        },
+        "url": {
+          "raw": "{{payment_base_url}}/v1/payments",
+          "host": ["{{payment_base_url}}"],
+          "path": ["v1", "payments"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Payment Gateway - Create Payment (missing idempotency key)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"senderId\": \"{{senderId}}\",\n  \"receiverId\": \"{{receiverId}}\",\n  \"amount\": 10.50,\n  \"currency\": \"USD\"\n}"
+        },
+        "url": {
+          "raw": "{{payment_base_url}}/v1/payments",
+          "host": ["{{payment_base_url}}"],
+          "path": ["v1", "payments"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Payment Gateway - Create Payment (duplicate idempotency)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey1}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"senderId\": \"{{senderId}}\",\n  \"receiverId\": \"{{receiverId}}\",\n  \"amount\": 10.50,\n  \"currency\": \"USD\"\n}"
+        },
+        "url": {
+          "raw": "{{payment_base_url}}/v1/payments",
+          "host": ["{{payment_base_url}}"],
+          "path": ["v1", "payments"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Payment Gateway - Create Payment (insufficient funds)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey2}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"senderId\": \"{{lowBalanceSenderId}}\",\n  \"receiverId\": \"{{receiverId}}\",\n  \"amount\": 100000.00,\n  \"currency\": \"USD\"\n}"
+        },
+        "url": {
+          "raw": "{{payment_base_url}}/v1/payments",
+          "host": ["{{payment_base_url}}"],
+          "path": ["v1", "payments"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Payment Gateway - Create Payment (sender not found)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey3}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"senderId\": \"{{nonExistentSenderId}}\",\n  \"receiverId\": \"{{receiverId}}\",\n  \"amount\": 10.00,\n  \"currency\": \"USD\"\n}"
+        },
+        "url": {
+          "raw": "{{payment_base_url}}/v1/payments",
+          "host": ["{{payment_base_url}}"],
+          "path": ["v1", "payments"]
+        }
+      },
+      "response": []
+    },
+    {
+      "name": "Payment Gateway - Create Payment (receiver not found)",
+      "request": {
+        "method": "POST",
+        "header": [
+          {
+            "key": "Content-Type",
+            "value": "application/json"
+          },
+          {
+            "key": "Idempotency-Key",
+            "value": "{{idempotencyKey4}}"
+          }
+        ],
+        "body": {
+          "mode": "raw",
+          "raw": "{\n  \"senderId\": \"{{senderId}}\",\n  \"receiverId\": \"{{nonExistentReceiverId}}\",\n  \"amount\": 10.00,\n  \"currency\": \"USD\"\n}"
+        },
+        "url": {
+          "raw": "{{payment_base_url}}/v1/payments",
+          "host": ["{{payment_base_url}}"],
+          "path": ["v1", "payments"]
+        }
+      },
+      "response": []
+    }
+  ],
+  "variable": [
+    {
+      "key": "payment_base_url",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "ledger_base_url",
+      "value": "http://localhost:8081"
+    },
+    {
+      "key": "senderId",
+      "value": "11111111-1111-1111-1111-111111111111"
+    },
+    {
+      "key": "receiverId",
+      "value": "22222222-2222-2222-2222-222222222222"
+    },
+    {
+      "key": "lowBalanceSenderId",
+      "value": "33333333-3333-3333-3333-333333333333"
+    },
+    {
+      "key": "nonExistentSenderId",
+      "value": "99999999-9999-9999-9999-999999999999"
+    },
+    {
+      "key": "nonExistentReceiverId",
+      "value": "88888888-8888-8888-8888-888888888888"
+    },
+    {
+      "key": "userId",
+      "value": "11111111-1111-1111-1111-111111111111"
+    },
+    {
+      "key": "idempotencyKey1",
+      "value": "idem-12345"
+    },
+    {
+      "key": "idempotencyKey2",
+      "value": "idem-54321"
+    },
+    {
+      "key": "idempotencyKey3",
+      "value": "idem-00003"
+    },
+    {
+      "key": "idempotencyKey4",
+      "value": "idem-00004"
+    },
+    {
+      "key": "idempotencyKey5",
+      "value": "idem-00005"
+    }
+  ]
+}
